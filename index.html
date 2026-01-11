@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Point Plotter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            max-width: 1200px;
+        }
+        
+        h1 {
+            margin-bottom: 10px;
+        }
+        
+        .section {
+            margin: 20px 0;
+        }
+        
+        .canvas-wrapper {
+            position: relative;
+            display: inline-block;
+            border: 1px solid #ccc;
+            margin: 10px 0;
+        }
+
+        .canvas-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: white;
+            z-index: 1;
+        }
+        
+        canvas {
+            position: relative;
+            display: block;
+            cursor: crosshair;
+            z-index: 2;
+        }
+        
+        button {
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            font-family: monospace;
+        }
+        
+        .info {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        label {
+            margin-right: 15px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Point Plotter</h1>
+    
+    <div class="section">
+        <label>Width: <input type="number" id="widthInput" value="800" min="100" max="2000"></label>
+        <label>Height: <input type="number" id="heightInput" value="600" min="100" max="2000"></label>
+        <button id="createCanvasBtn">Create Canvas</button>
+    </div>
+    
+    <div class="canvas-wrapper" id="canvasWrapper" style="display: none;">
+        <div class="canvas-background" id="canvasBackground"></div>
+        <canvas id="canvas"></canvas>
+    </div>
+    
+    <div class="section" id="controls" style="display: none;">
+        <button id="undoBtn">Undo</button>
+        <button id="clearBtn">Clear</button>
+        <button id="exportBtn">Copy</button>
+        <label><input type="checkbox" id="gridToggle"> Show Grid</label>
+        <span class="info" id="pointCount">Points: 0</span>
+    </div>
+    
+    <div class="section" id="outputSection" style="display: none;">
+        <textarea id="output" readonly></textarea>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const canvasWrapper = document.getElementById('canvasWrapper');
+        const canvasBackground = document.getElementById('canvasBackground');
+        const controls = document.getElementById('controls');
+        const outputSection = document.getElementById('outputSection');
+        const output = document.getElementById('output');
+        const pointCount = document.getElementById('pointCount');
+        const gridToggle = document.getElementById('gridToggle');
+        const createCanvasBtn = document.getElementById('createCanvasBtn');
+        const widthInput = document.getElementById('widthInput');
+        const heightInput = document.getElementById('heightInput');
+        
+        let points = [];
+        let showGrid = false;
+
+        createCanvasBtn.addEventListener('click', function() {
+            const width = parseInt(widthInput.value);
+            const height = parseInt(heightInput.value);
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            canvasBackground.style.width = width + 'px';
+            canvasBackground.style.height = height + 'px';
+            
+            points = [];
+            initializeCanvas();
+        });
+
+        function initializeCanvas() {
+            redrawCanvas();
+            canvasWrapper.style.display = 'inline-block';
+            controls.style.display = 'block';
+            outputSection.style.display = 'block';
+            updateOutput();
+        }
+
+        gridToggle.addEventListener('change', function() {
+            showGrid = this.checked;
+            redrawCanvas();
+        });
+        
+        canvas.addEventListener('click', function(e) {
+            const rect = canvas.getBoundingClientRect();
+            const canvasX = e.clientX - rect.left;
+            const canvasY = e.clientY - rect.top;
+
+			// Scaling to better fit python turtle coords
+            
+            // Half scale points
+            const scaledX = canvasX / 2;
+            const scaledY = canvasY / 2;
+            
+            // Invert Y axis (HTML canvas y is the opposite of python)
+            const invertedY = (canvas.height / 2) - scaledY;
+            
+            // Round 0.5 up
+            const finalX = Math.round(scaledX);
+            const finalY = Math.round(invertedY);
+            
+            points.push({canvasX, canvasY, x: finalX, y: finalY});
+            redrawCanvas();
+            updateOutput();
+        });
+        
+        document.getElementById('undoBtn').addEventListener('click', function() {
+            if (points.length > 0) {
+                points.pop();
+                redrawCanvas();
+                updateOutput();
+            }
+        });
+        
+        document.getElementById('clearBtn').addEventListener('click', function() {
+            points = [];
+            redrawCanvas();
+            updateOutput();
+        });
+        
+        document.getElementById('exportBtn').addEventListener('click', function() {
+            output.select();
+            document.execCommand('copy');
+        });
+        
+        function drawGrid() {
+            const gridSize = 50; // pixels
+            
+            ctx.strokeStyle = '#ddd';
+            ctx.lineWidth = 1;
+            
+            // Vertical lines
+            for (let x = 0; x <= canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            
+            // Horizontal lines
+            for (let y = 0; y <= canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+        
+        function redrawCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (showGrid) {
+                drawGrid();
+            }
+            
+            points.forEach((point, index) => {
+                ctx.fillStyle = 'red';
+                ctx.beginPath();
+                ctx.arc(point.canvasX, point.canvasY, 4, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                ctx.fillStyle = 'black';
+                ctx.font = '12px Arial';
+                ctx.fillText(index + 1, point.canvasX + 8, point.canvasY - 8);
+            });
+        }
+        
+        function updateOutput() {
+            pointCount.textContent = `Points: ${points.length}`;
+            
+            if (points.length === 0) {
+                output.value = '[]';
+                return;
+            }
+            
+            const tuples = points.map(p => `(${p.x}, ${p.y})`).join(',\n    ');
+            output.value = `[\n    ${tuples}\n]`;
+        }
+    </script>
+</body>
+</html>
