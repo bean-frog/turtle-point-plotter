@@ -8,3 +8,5 @@ def foo(points):
 		...
 		# turtle.goto(x,y), etc
 ```
+
+I may or may not make this better in the future, its just a quick thing i whipped up to help with an assignment lol
